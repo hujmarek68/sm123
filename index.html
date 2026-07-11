@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
+    <title>Wiadomości</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <style>
+        body { background: #000; color: #fff; font-family: -apple-system, sans-serif; margin: 0; }
+        #auth-screen, #main-app, #chat-view { padding: 20px; height: 100vh; display: flex; flex-direction: column; box-sizing: border-box; }
+        #main-app, #chat-view { display: none; }
+        
+        /* Styl listy wiadomości */
+        .item { padding: 15px; border-bottom: 1px solid #222; cursor: pointer; display: flex; align-items: center; }
+        .item-text { flex-grow: 1; overflow: hidden; }
+        .item-title { font-weight: bold; font-size: 17px; }
+        .item-preview { color: #888; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px; }
+        
+        input { padding: 12px; margin-bottom: 10px; border-radius: 10px; border: none; background: #222; color: #fff; }
+        button { padding: 12px; background: #007AFF; color: white; border: none; border-radius: 10px; cursor: pointer; }
+        
+        /* Stylizacja czatu */
+        #messages { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px 0; }
+        .msg { max-width: 75%; padding: 10px 15px; border-radius: 18px; font-size: 16px; word-wrap: break-word; }
+        .sent { background: #34C759; align-self: flex-end; color: white; }
+        .received { background: #333; align-self: flex-start; color: white; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-screen" style="display:flex;">
+        <h2>Logowanie</h2>
+        <input type="text" id="username" placeholder="Nazwa">
+        <input type="text" id="phone" placeholder="Numer telefonu">
+        <button onclick="login()">Zaloguj się</button>
+    </div>
+
+    <div id="main-app">
+        <h1 style="margin-top: 0;">Wiadomości</h1>
+        <div id="list"></div>
+        <button onclick="openModal()" style="margin-top: 20px;">+ Dodaj kontakt</button>
+    </div>
+
+    <div id="chat-view">
+        <button onclick="location.reload()" style="width: 80px;">← Wstecz</button>
+        <h2 id="chat-title" style="text-align: center;"></h2>
+        <div id="messages"></div>
+        <input type="text" id="msgInput" placeholder="Napisz wiadomość...">
+        <button onclick="sendMsg()">Wyślij</button>
+    </div>
+
+    <div id="modal" style="display:none; position:fixed; top:20%; left:10%; width:80%; background:#1c1c1e; padding:20px; border-radius:20px;">
+        <h3>Dodaj kontakt</h3>
+        <input type="text" id="newName" placeholder="Nazwa" style="width:100%; box-sizing:border-box;">
+        <input type="text" id="newPhone" placeholder="Numer" style="width:100%; box-sizing:border-box;">
+        <button onclick="saveContact()" style="width:100%;">Dodaj</button>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAetQLNfeS69hofKicFsN_BeaqslnL9Ows",
+            authDomain: "sms123-454d3.firebaseapp.com",
+            databaseURL: "https://sms123-454d3-default-rtdb.firebaseio.com",
+            projectId: "sms123-454d3",
+            storageBucket: "sms123-454d3.firebasestorage.app",
+            messagingSenderId: "607529107448",
+            appId: "1:607529107448:web:7ae2547a16af919cc5a00d",
+            measurementId: "G-RK0TP4NDV1"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        let currentChatPhone = null;
+
+        function login() {
+            const name = document.getElementById('username').value;
+            const phone = document.getElementById('phone').value;
+            if(!name || !phone) return alert("Wypełnij wszystko!");
+            db.ref('users/' + phone).set({name, phone}).then(() => {
+                localStorage.setItem('myPhone', phone);
+                showApp();
+            });
+        }
+
+        function showApp() {
+            document.getElementById('auth-screen').style.display = 'none';
+            document.getElementById('main-app').style.display = 'flex';
+            renderContacts();
+        }
+
+        function renderContacts() {
+            db.ref('users/' + localStorage.getItem('myPhone') + '/contacts').on('value', snap => {
+                const list = document.getElementById('list');
+                list.innerHTML = '';
+                const contacts = snap.val() || {};
+                
+                Object.values(contacts).forEach(c => {
+                    const chatId = [localStorage.getItem('myPhone'), c.phone].sort().join('_');
+                    
+                    // Pobranie ostatniej wiadomości do podglądu
+                    db.ref('chats/' + chatId).limitToLast(1).on('value', snapMsg => {
+                        const msgs = snapMsg.val();
+                        let preview = "Brak wiadomości";
+                        if(msgs) preview = Object.values(msgs)[0].text;
+                        
+                        list.innerHTML += `
+                            <div class="item" onclick="enterChat('${c.phone}', '${c.name}')">
+                                <div class="item-text">
+                                    <div class="item-title">${c.name}</div>
+                                    <div class="item-preview">${preview}</div>
+                                </div>
+                            </div>`;
+                    });
+                });
+            });
+        }
+
+        function enterChat(phone, name) {
+            currentChatPhone = phone;
+            document.getElementById('main-app').style.display = 'none';
+            document.getElementById('chat-view').style.display = 'flex';
+            document.getElementById('chat-title').innerText = name;
+            
+            const myPhone = localStorage.getItem('myPhone');
+            const chatId = [myPhone, phone].sort().join('_');
+            
+            db.ref('chats/' + chatId).on('value', snap => {
+                const msgs = document.getElementById('messages');
+                msgs.innerHTML = '';
+                Object.values(snap.val() || {}).forEach(m => {
+                    const isMine = m.from === myPhone;
+                    msgs.innerHTML += `<div class="msg ${isMine ? 'sent' : 'received'}">${m.text}</div>`;
+                });
+                msgs.scrollTop = msgs.scrollHeight;
+            });
+        }
+
+        function sendMsg() {
+            const text = document.getElementById('msgInput').value;
+            if(!text) return;
+            const myPhone = localStorage.getItem('myPhone');
+            const chatId = [myPhone, currentChatPhone].sort().join('_');
+            
+            db.ref('chats/' + chatId).push({
+                text: text,
+                from: myPhone
+            });
+            document.getElementById('msgInput').value = '';
+        }
+
+        function openModal() { document.getElementById('modal').style.display = 'block'; }
+        function saveContact() {
+            const name = document.getElementById('newName').value;
+            const phone = document.getElementById('newPhone').value;
+            db.ref('users/' + localStorage.getItem('myPhone') + '/contacts/' + phone).set({name, phone});
+            location.reload();
+        }
+
+        if (localStorage.getItem('myPhone')) showApp();
+        if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+    </script>
+</body>
+</html>
