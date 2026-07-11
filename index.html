@@ -18,10 +18,14 @@
         input { padding: 12px; margin-bottom: 10px; border-radius: 10px; border: none; background: #222; color: #fff; font-size: 16px; }
         button { padding: 12px; background: #007AFF; color: white; border: none; border-radius: 10px; cursor: pointer; }
         #messages { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px 0; }
-        .msg { max-width: 75%; padding: 10px 15px; border-radius: 18px; font-size: 16px; word-wrap: break-word; display: flex; flex-direction: column; position: relative; transition: transform 0.2s; }
+        .msg { max-width: 75%; padding: 10px 15px; border-radius: 18px; font-size: 16px; word-wrap: break-word; display: flex; flex-direction: column; position: relative; }
         .sent { background: #34C759; align-self: flex-end; color: white; }
         .received { background: #333; align-self: flex-start; color: white; }
         .meta { font-size: 10px; margin-top: 4px; opacity: 0.7; text-align: right; }
+        
+        #reply-panel { display: none; background: #1c1c1e; border-left: 4px solid #34C759; padding: 10px; margin-bottom: 10px; border-radius: 8px; }
+        .reply-who { color: #34C759; font-weight: bold; font-size: 12px; }
+        .reply-preview { color: #ccc; font-size: 14px; margin-top: 2px; }
     </style>
 </head>
 <body>
@@ -37,9 +41,16 @@
         <button onclick="openModal()" style="margin-top: 20px;">+ Dodaj kontakt</button>
     </div>
     <div id="chat-view">
-        <button onclick="location.reload()" style="width: 80px;">← Wstecz</button>
+        <button onclick="exitChat()" style="width: 80px;">← Wstecz</button>
         <h2 id="chat-title" style="text-align: center;"></h2>
         <div id="messages"></div>
+        
+        <div id="reply-panel">
+            <div class="reply-who" id="reply-who"></div>
+            <div class="reply-preview" id="reply-preview"></div>
+            <button onclick="cancelReply()" style="float:right; background:none; border:none; color:#888;">✕</button>
+        </div>
+
         <div style="display: flex; gap: 10px;">
             <input type="text" id="msgInput" placeholder="Napisz wiadomość..." style="flex-grow: 1; margin-bottom: 0;" oninput="setTyping(true)">
             <button onclick="sendMsg()">Wyślij</button>
@@ -57,9 +68,11 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
         let currentChatPhone = null;
+        let replyingTo = null;
 
         function login() { const n = document.getElementById('username').value; const p = document.getElementById('phone').value; if(!n || !p) return; db.ref('users/' + p).set({name: n, phone: p}).then(() => { localStorage.setItem('myPhone', p); showApp(); }); }
         function showApp() { document.getElementById('auth-screen').style.display = 'none'; document.getElementById('main-app').style.display = 'flex'; renderContacts(); }
+        function exitChat() { db.ref().off(); document.getElementById('chat-view').style.display = 'none'; document.getElementById('main-app').style.display = 'flex'; }
         
         function renderContacts() {
             db.ref('users/' + localStorage.getItem('myPhone') + '/contacts').on('value', snap => {
@@ -75,31 +88,33 @@
         }
 
         function enterChat(phone, name) {
-            currentChatPhone = phone; document.getElementById('main-app').style.display = 'none'; document.getElementById('chat-view').style.display = 'flex';
-            db.ref().off();
-            db.ref('status/' + phone).on('value', s => document.getElementById('chat-title').innerText = s.val() ? "Pisze..." : name);
-            const myPhone = localStorage.getItem('myPhone');
-            const chatId = [myPhone, phone].sort().join('_');
+            currentChatPhone = phone; 
+            document.getElementById('main-app').style.display = 'none'; 
+            document.getElementById('chat-view').style.display = 'flex';
+            document.getElementById('chat-title').innerText = name;
             
-            db.ref('chats/' + chatId).on('value', snap => {
+            db.ref().off(); // Czyścimy wszystko przed wejściem
+            
+            db.ref('chats/' + [localStorage.getItem('myPhone'), phone].sort().join('_')).on('value', snap => {
                 const msgsDiv = document.getElementById('messages'); msgsDiv.innerHTML = '';
                 const data = snap.val() || {};
                 Object.keys(data).forEach(key => {
                     const m = data[key];
-                    const isMine = m.from === myPhone;
-                    if(!isMine && !m.read) db.ref('chats/' + chatId + '/' + key + '/read').set(true);
+                    const isMine = m.from === localStorage.getItem('myPhone');
                     
                     const div = document.createElement('div');
                     div.className = `msg ${isMine ? 'sent' : 'received'}`;
-                    div.innerHTML = `${m.text}<div class="meta">${new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} ${isMine ? (m.read ? '✓✓' : '✓') : ''}</div>`;
+                    let replyHtml = m.replyTo ? `<div style="background:rgba(0,0,0,0.3); padding:5px; margin-bottom:5px; border-radius:5px; border-left:2px solid #34C759; font-size:12px;"><div style="color:#34C759">Odp:</div>${m.replyTo.text}</div>` : '';
+                    div.innerHTML = `${replyHtml}${m.text}<div class="meta">${new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>`;
                     
-                    // Obsługa gestów
                     let startX;
                     div.ontouchstart = e => startX = e.touches[0].clientX;
                     div.ontouchend = e => {
-                        let diff = startX - e.changedTouches[0].clientX;
-                        if(Math.abs(diff) > 50) {
-                            document.getElementById('msgInput').value = `Odpowiedź: "${m.text.substring(0, 20)}..." `;
+                        if(Math.abs(startX - e.changedTouches[0].clientX) > 50) {
+                            replyingTo = { text: m.text };
+                            document.getElementById('reply-panel').style.display = 'block';
+                            document.getElementById('reply-who').innerText = isMine ? "Ty" : name;
+                            document.getElementById('reply-preview').innerText = m.text;
                             document.getElementById('msgInput').focus();
                         }
                     };
@@ -109,8 +124,15 @@
             });
         }
 
-        function setTyping(val) { db.ref('status/' + localStorage.getItem('myPhone')).set(val); clearTimeout(window.t); window.t = setTimeout(() => db.ref('status/' + localStorage.getItem('myPhone')).set(false), 3000); }
-        function sendMsg() { const text = document.getElementById('msgInput').value; if(!text) return; db.ref('chats/' + [localStorage.getItem('myPhone'), currentChatPhone].sort().join('_')).push({ text, from: localStorage.getItem('myPhone'), timestamp: Date.now(), read: false }); document.getElementById('msgInput').value = ''; setTyping(false); }
+        function cancelReply() { document.getElementById('reply-panel').style.display = 'none'; replyingTo = null; }
+        function sendMsg() { 
+            const input = document.getElementById('msgInput');
+            if(!input.value.trim()) return; 
+            const msg = { text: input.value, from: localStorage.getItem('myPhone'), timestamp: Date.now() };
+            if(replyingTo) msg.replyTo = replyingTo;
+            db.ref('chats/' + [localStorage.getItem('myPhone'), currentChatPhone].sort().join('_')).push(msg); 
+            input.value = ''; cancelReply();
+        }
         function openModal() { document.getElementById('modal').style.display = 'block'; }
         function saveContact() { db.ref('users/' + localStorage.getItem('myPhone') + '/contacts/' + document.getElementById('newPhone').value).set({name: document.getElementById('newName').value, phone: document.getElementById('newPhone').value}); location.reload(); }
         if (localStorage.getItem('myPhone')) showApp();
