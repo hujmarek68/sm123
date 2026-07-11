@@ -47,8 +47,11 @@
         <button onclick="location.reload()" style="width: 80px;">← Wstecz</button>
         <h2 id="chat-title" style="text-align: center;"></h2>
         <div id="messages"></div>
-        <input type="text" id="msgInput" placeholder="Napisz wiadomość...">
-        <button onclick="sendMsg()">Wyślij</button>
+        
+        <div style="display: flex; gap: 10px;">
+            <input type="text" id="msgInput" placeholder="Napisz wiadomość..." style="flex-grow: 1; margin-bottom: 0;">
+            <button onclick="sendMsg()">Wyślij</button>
+        </div>
     </div>
 
     <div id="modal" style="display:none; position:fixed; top:20%; left:10%; width:80%; background:#1c1c1e; padding:20px; border-radius:20px;">
@@ -98,7 +101,6 @@
                 Object.values(contacts).forEach(c => {
                     const chatId = [localStorage.getItem('myPhone'), c.phone].sort().join('_');
                     
-                    // Pobranie ostatniej wiadomości do podglądu
                     db.ref('chats/' + chatId).limitToLast(1).on('value', snapMsg => {
                         const msgs = snapMsg.val();
                         let preview = "Brak wiadomości";
