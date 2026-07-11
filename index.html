@@ -12,17 +12,15 @@
         #auth-screen, #main-app, #chat-view { padding: 20px; height: 100vh; display: flex; flex-direction: column; box-sizing: border-box; }
         #main-app, #chat-view { display: none; }
         .item { padding: 15px; border-bottom: 1px solid #222; display: flex; align-items: center; justify-content: space-between; }
-        .item-content { flex-grow: 1; cursor: pointer; overflow: hidden; }
+        .item-content { flex-grow: 1; cursor: pointer; }
         .item-title { font-weight: bold; font-size: 17px; }
-        .item-preview { color: #888; font-size: 14px; margin-top: 4px; }
-        .del-btn { color: #ff3b30; font-weight: bold; padding: 10px; cursor: pointer; }
+        .del-btn { color: #ff3b30; padding: 10px; cursor: pointer; font-size: 20px; }
         input { padding: 12px; margin-bottom: 10px; border-radius: 10px; border: none; background: #222; color: #fff; font-size: 16px; width: 100%; box-sizing: border-box; }
         button { padding: 12px; background: #007AFF; color: white; border: none; border-radius: 10px; cursor: pointer; }
         #messages { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px 0; }
-        .msg { max-width: 75%; padding: 10px 15px; border-radius: 18px; font-size: 16px; word-wrap: break-word; }
-        .sent { background: #34C759; align-self: flex-end; color: white; }
-        .received { background: #333; align-self: flex-start; color: white; }
-        #reply-panel { display: none; background: #1c1c1e; border-left: 4px solid #34C759; padding: 10px; margin-bottom: 10px; border-radius: 8px; }
+        .msg { max-width: 75%; padding: 10px 15px; border-radius: 18px; font-size: 16px; }
+        .sent { background: #34C759; align-self: flex-end; }
+        .received { background: #333; align-self: flex-start; }
     </style>
 </head>
 <body>
@@ -33,7 +31,7 @@
         <button onclick="login()">Zaloguj się</button>
     </div>
     <div id="main-app">
-        <h1 style="margin-top: 0;">Wiadomości</h1>
+        <h1>Wiadomości</h1>
         <div id="list"></div>
         <button onclick="document.getElementById('modal').style.display='block'" style="margin-top: 20px;">+ Dodaj kontakt</button>
     </div>
@@ -41,12 +39,8 @@
         <button onclick="exitChat()" style="width: 80px;">← Wstecz</button>
         <h2 id="chat-title" style="text-align: center;"></h2>
         <div id="messages"></div>
-        <div id="reply-panel">
-            <button onclick="cancelReply()" style="float:right; background:none; color:#888;">✕</button>
-            <div id="reply-preview" style="font-size:12px; color:#aaa;"></div>
-        </div>
         <div style="display: flex; gap: 10px;">
-            <input type="text" id="msgInput" placeholder="Napisz..." style="flex-grow: 1; margin-bottom: 0;">
+            <input type="text" id="msgInput" placeholder="Napisz..." style="margin-bottom: 0;">
             <button onclick="sendMsg()">Wyślij</button>
         </div>
     </div>
@@ -62,45 +56,55 @@
         const firebaseConfig = { apiKey: "AIzaSyAetQLNfeS69hofKicFsN_BeaqslnL9Ows", authDomain: "sms123-454d3.firebaseapp.com", databaseURL: "https://sms123-454d3-default-rtdb.firebaseio.com", projectId: "sms123-454d3", storageBucket: "sms123-454d3.firebasestorage.app", messagingSenderId: "607529107448", appId: "1:607529107448:web:7ae2547a16af919cc5a00d", measurementId: "G-RK0TP4NDV1" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
+        let currentChatPhone = null;
 
         function login() { const n = document.getElementById('username').value; const p = document.getElementById('phone').value; if(!n || !p) return; db.ref('users/' + p).set({name: n, phone: p}).then(() => { localStorage.setItem('myPhone', p); showApp(); }); }
         function showApp() { document.getElementById('auth-screen').style.display = 'none'; document.getElementById('main-app').style.display = 'flex'; renderContacts(); }
-        function exitChat() { db.ref().off(); document.getElementById('chat-view').style.display = 'none'; document.getElementById('main-app').style.display = 'flex'; renderContacts(); }
+        function exitChat() { document.getElementById('chat-view').style.display = 'none'; document.getElementById('main-app').style.display = 'flex'; renderContacts(); }
         
         function renderContacts() {
-            db.ref().off();
             db.ref('users/' + localStorage.getItem('myPhone') + '/contacts').once('value', snap => {
                 const list = document.getElementById('list'); list.innerHTML = '';
                 Object.entries(snap.val() || {}).forEach(([phone, c]) => {
                     const el = document.createElement('div');
                     el.className = 'item';
-                    el.innerHTML = `
-                        <div class="item-content" onclick="enterChat('${phone}', '${c.name}')">
-                            <div class="item-title">${c.name}</div>
-                        </div>
-                        <div class="del-btn" onclick="deleteContact('${phone}')">✕</div>`;
+                    el.innerHTML = `<div class="item-content" onclick="enterChat('${phone}', '${c.name}')"><div class="item-title">${c.name}</div></div><div class="del-btn" onclick="deleteContact('${phone}')">✕</div>`;
                     list.appendChild(el);
                 });
             });
         }
 
-        function deleteContact(phone) {
-            db.ref('users/' + localStorage.getItem('myPhone') + '/contacts/' + phone).remove().then(() => renderContacts());
-        }
-
+        function deleteContact(phone) { db.ref('users/' + localStorage.getItem('myPhone') + '/contacts/' + phone).remove().then(() => renderContacts()); }
         function saveContact() { 
             const p = document.getElementById('newPhone').value;
             const n = document.getElementById('newName').value;
-            if(!p) return alert("Numer wymagany!");
-            db.ref('users/' + localStorage.getItem('myPhone') + '/contacts/' + p).set({name: n || p, phone: p})
-              .then(() => { document.getElementById('modal').style.display = 'none'; renderContacts(); }); 
+            if(!p) return alert("Wpisz numer!");
+            db.ref('users/' + localStorage.getItem('myPhone') + '/contacts/' + p).set({name: n || p, phone: p}).then(() => { document.getElementById('modal').style.display = 'none'; renderContacts(); }); 
         }
 
         function enterChat(phone, name) {
+            currentChatPhone = phone;
             document.getElementById('main-app').style.display = 'none';
             document.getElementById('chat-view').style.display = 'flex';
             document.getElementById('chat-title').innerText = name;
-            // Tutaj logika chatu...
+            const chatId = [localStorage.getItem('myPhone'), phone].sort().join('_');
+            db.ref('chats/' + chatId).on('value', snap => {
+                const msgsDiv = document.getElementById('messages'); msgsDiv.innerHTML = '';
+                Object.values(snap.val() || {}).forEach(m => {
+                    const div = document.createElement('div');
+                    div.className = `msg ${m.from === localStorage.getItem('myPhone') ? 'sent' : 'received'}`;
+                    div.innerText = m.text;
+                    msgsDiv.appendChild(div);
+                });
+            });
+        }
+
+        function sendMsg() { 
+            const input = document.getElementById('msgInput');
+            if(!input.value.trim()) return; 
+            const chatId = [localStorage.getItem('myPhone'), currentChatPhone].sort().join('_');
+            db.ref('chats/' + chatId).push({text: input.value, from: localStorage.getItem('myPhone'), timestamp: Date.now()}); 
+            input.value = '';
         }
         
         if (localStorage.getItem('myPhone')) showApp();
