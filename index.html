@@ -11,49 +11,40 @@
         body { background: #000; color: #fff; font-family: -apple-system, sans-serif; margin: 0; }
         #auth-screen, #main-app, #chat-view { padding: 20px; height: 100vh; display: flex; flex-direction: column; box-sizing: border-box; }
         #main-app, #chat-view { display: none; }
-        
-        /* Styl listy wiadomości */
         .item { padding: 15px; border-bottom: 1px solid #222; cursor: pointer; display: flex; align-items: center; }
         .item-text { flex-grow: 1; overflow: hidden; }
         .item-title { font-weight: bold; font-size: 17px; }
         .item-preview { color: #888; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px; }
-        
         input { padding: 12px; margin-bottom: 10px; border-radius: 10px; border: none; background: #222; color: #fff; }
         button { padding: 12px; background: #007AFF; color: white; border: none; border-radius: 10px; cursor: pointer; }
-        
-        /* Stylizacja czatu */
         #messages { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px 0; }
-        .msg { max-width: 75%; padding: 10px 15px; border-radius: 18px; font-size: 16px; word-wrap: break-word; }
+        .msg { max-width: 75%; padding: 10px 15px; border-radius: 18px; font-size: 16px; word-wrap: break-word; display: flex; flex-direction: column; }
         .sent { background: #34C759; align-self: flex-end; color: white; }
         .received { background: #333; align-self: flex-start; color: white; }
+        .meta { font-size: 10px; margin-top: 4px; opacity: 0.7; text-align: right; }
     </style>
 </head>
 <body>
-
     <div id="auth-screen" style="display:flex;">
         <h2>Logowanie</h2>
         <input type="text" id="username" placeholder="Nazwa">
         <input type="text" id="phone" placeholder="Numer telefonu">
         <button onclick="login()">Zaloguj się</button>
     </div>
-
     <div id="main-app">
         <h1 style="margin-top: 0;">Wiadomości</h1>
         <div id="list"></div>
         <button onclick="openModal()" style="margin-top: 20px;">+ Dodaj kontakt</button>
     </div>
-
     <div id="chat-view">
         <button onclick="location.reload()" style="width: 80px;">← Wstecz</button>
         <h2 id="chat-title" style="text-align: center;"></h2>
         <div id="messages"></div>
-        
         <div style="display: flex; gap: 10px;">
-            <input type="text" id="msgInput" placeholder="Napisz wiadomość..." style="flex-grow: 1; margin-bottom: 0;">
+            <input type="text" id="msgInput" placeholder="Napisz wiadomość..." style="flex-grow: 1; margin-bottom: 0;" oninput="setTyping(true)">
             <button onclick="sendMsg()">Wyślij</button>
         </div>
     </div>
-
     <div id="modal" style="display:none; position:fixed; top:20%; left:10%; width:80%; background:#1c1c1e; padding:20px; border-radius:20px;">
         <h3>Dodaj kontakt</h3>
         <input type="text" id="newName" placeholder="Nazwa" style="width:100%; box-sizing:border-box;">
@@ -62,105 +53,61 @@
     </div>
 
     <script>
-        const firebaseConfig = {
-            apiKey: "AIzaSyAetQLNfeS69hofKicFsN_BeaqslnL9Ows",
-            authDomain: "sms123-454d3.firebaseapp.com",
-            databaseURL: "https://sms123-454d3-default-rtdb.firebaseio.com",
-            projectId: "sms123-454d3",
-            storageBucket: "sms123-454d3.firebasestorage.app",
-            messagingSenderId: "607529107448",
-            appId: "1:607529107448:web:7ae2547a16af919cc5a00d",
-            measurementId: "G-RK0TP4NDV1"
-        };
+        const firebaseConfig = { apiKey: "AIzaSyAetQLNfeS69hofKicFsN_BeaqslnL9Ows", authDomain: "sms123-454d3.firebaseapp.com", databaseURL: "https://sms123-454d3-default-rtdb.firebaseio.com", projectId: "sms123-454d3", storageBucket: "sms123-454d3.firebasestorage.app", messagingSenderId: "607529107448", appId: "1:607529107448:web:7ae2547a16af919cc5a00d", measurementId: "G-RK0TP4NDV1" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
         let currentChatPhone = null;
 
-        function login() {
-            const name = document.getElementById('username').value;
-            const phone = document.getElementById('phone').value;
-            if(!name || !phone) return alert("Wypełnij wszystko!");
-            db.ref('users/' + phone).set({name, phone}).then(() => {
-                localStorage.setItem('myPhone', phone);
-                showApp();
-            });
-        }
-
-        function showApp() {
-            document.getElementById('auth-screen').style.display = 'none';
-            document.getElementById('main-app').style.display = 'flex';
-            renderContacts();
-        }
-
+        function login() { const n = document.getElementById('username').value; const p = document.getElementById('phone').value; if(!n || !p) return; db.ref('users/' + p).set({name: n, phone: p}).then(() => { localStorage.setItem('myPhone', p); showApp(); }); }
+        function showApp() { document.getElementById('auth-screen').style.display = 'none'; document.getElementById('main-app').style.display = 'flex'; renderContacts(); }
+        
         function renderContacts() {
             db.ref('users/' + localStorage.getItem('myPhone') + '/contacts').on('value', snap => {
-                const list = document.getElementById('list');
-                list.innerHTML = '';
-                const contacts = snap.val() || {};
-                
-                Object.values(contacts).forEach(c => {
+                const list = document.getElementById('list'); list.innerHTML = '';
+                Object.values(snap.val() || {}).forEach(c => {
                     const chatId = [localStorage.getItem('myPhone'), c.phone].sort().join('_');
-                    
-                    db.ref('chats/' + chatId).limitToLast(1).on('value', snapMsg => {
-                        const msgs = snapMsg.val();
-                        let preview = "Brak wiadomości";
-                        if(msgs) preview = Object.values(msgs)[0].text;
-                        
-                        list.innerHTML += `
-                            <div class="item" onclick="enterChat('${c.phone}', '${c.name}')">
-                                <div class="item-text">
-                                    <div class="item-title">${c.name}</div>
-                                    <div class="item-preview">${preview}</div>
-                                </div>
-                            </div>`;
+                    db.ref('chats/' + chatId).limitToLast(1).on('value', s => {
+                        const m = s.val() ? Object.values(s.val())[0] : null;
+                        list.innerHTML += `<div class="item" onclick="enterChat('${c.phone}', '${c.name}')"><div class="item-text"><div class="item-title">${c.name}</div><div class="item-preview">${m ? m.text : 'Brak wiadomości'}</div></div></div>`;
                     });
                 });
             });
         }
 
         function enterChat(phone, name) {
-            currentChatPhone = phone;
-            document.getElementById('main-app').style.display = 'none';
-            document.getElementById('chat-view').style.display = 'flex';
-            document.getElementById('chat-title').innerText = name;
-            
+            currentChatPhone = phone; document.getElementById('main-app').style.display = 'none'; document.getElementById('chat-view').style.display = 'flex';
+            db.ref('status/' + phone).on('value', s => document.getElementById('chat-title').innerText = s.val() ? "Pisze..." : name);
             const myPhone = localStorage.getItem('myPhone');
             const chatId = [myPhone, phone].sort().join('_');
             
             db.ref('chats/' + chatId).on('value', snap => {
-                const msgs = document.getElementById('messages');
-                msgs.innerHTML = '';
-                Object.values(snap.val() || {}).forEach(m => {
+                const msgsDiv = document.getElementById('messages'); msgsDiv.innerHTML = '';
+                const data = snap.val() || {};
+                Object.keys(data).forEach(key => {
+                    const m = data[key];
                     const isMine = m.from === myPhone;
-                    msgs.innerHTML += `<div class="msg ${isMine ? 'sent' : 'received'}">${m.text}</div>`;
+                    if(!isMine && !m.read) db.ref('chats/' + chatId + '/' + key + '/read').set(true);
+                    const time = new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    msgsDiv.innerHTML += `<div class="msg ${isMine ? 'sent' : 'received'}">${m.text}<div class="meta">${time} ${isMine ? (m.read ? '✓✓' : '✓') : ''}</div></div>`;
                 });
-                msgs.scrollTop = msgs.scrollHeight;
+                msgsDiv.scrollTop = msgsDiv.scrollHeight;
             });
+        }
+
+        function setTyping(val) { 
+            db.ref('status/' + localStorage.getItem('myPhone')).set(val); 
+            clearTimeout(window.t); window.t = setTimeout(() => db.ref('status/' + localStorage.getItem('myPhone')).set(false), 3000); 
         }
 
         function sendMsg() {
-            const text = document.getElementById('msgInput').value;
-            if(!text) return;
-            const myPhone = localStorage.getItem('myPhone');
-            const chatId = [myPhone, currentChatPhone].sort().join('_');
-            
-            db.ref('chats/' + chatId).push({
-                text: text,
-                from: myPhone
-            });
-            document.getElementById('msgInput').value = '';
+            const text = document.getElementById('msgInput').value; if(!text) return;
+            db.ref('chats/' + [localStorage.getItem('myPhone'), currentChatPhone].sort().join('_')).push({ text, from: localStorage.getItem('myPhone'), timestamp: Date.now(), read: false });
+            document.getElementById('msgInput').value = ''; setTyping(false);
         }
 
         function openModal() { document.getElementById('modal').style.display = 'block'; }
-        function saveContact() {
-            const name = document.getElementById('newName').value;
-            const phone = document.getElementById('newPhone').value;
-            db.ref('users/' + localStorage.getItem('myPhone') + '/contacts/' + phone).set({name, phone});
-            location.reload();
-        }
-
+        function saveContact() { db.ref('users/' + localStorage.getItem('myPhone') + '/contacts/' + document.getElementById('newPhone').value).set({name: document.getElementById('newName').value, phone: document.getElementById('newPhone').value}); location.reload(); }
         if (localStorage.getItem('myPhone')) showApp();
-        if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
     </script>
 </body>
 </html>
