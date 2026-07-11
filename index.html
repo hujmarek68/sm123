@@ -2,23 +2,23 @@
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href="manifest.json">
     <title>Wiadomości</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
-        body { background: #000; color: #fff; font-family: -apple-system, sans-serif; margin: 0; }
+        body { background: #000; color: #fff; font-family: -apple-system, sans-serif; margin: 0; touch-action: manipulation; }
         #auth-screen, #main-app, #chat-view { padding: 20px; height: 100vh; display: flex; flex-direction: column; box-sizing: border-box; }
         #main-app, #chat-view { display: none; }
         .item { padding: 15px; border-bottom: 1px solid #222; cursor: pointer; display: flex; align-items: center; }
         .item-text { flex-grow: 1; overflow: hidden; }
         .item-title { font-weight: bold; font-size: 17px; }
         .item-preview { color: #888; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px; }
-        input { padding: 12px; margin-bottom: 10px; border-radius: 10px; border: none; background: #222; color: #fff; }
+        input { padding: 12px; margin-bottom: 10px; border-radius: 10px; border: none; background: #222; color: #fff; font-size: 16px; }
         button { padding: 12px; background: #007AFF; color: white; border: none; border-radius: 10px; cursor: pointer; }
         #messages { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px 0; }
-        .msg { max-width: 75%; padding: 10px 15px; border-radius: 18px; font-size: 16px; word-wrap: break-word; display: flex; flex-direction: column; }
+        .msg { max-width: 75%; padding: 10px 15px; border-radius: 18px; font-size: 16px; word-wrap: break-word; display: flex; flex-direction: column; position: relative; transition: transform 0.2s; }
         .sent { background: #34C759; align-self: flex-end; color: white; }
         .received { background: #333; align-self: flex-start; color: white; }
         .meta { font-size: 10px; margin-top: 4px; opacity: 0.7; text-align: right; }
@@ -76,6 +76,7 @@
 
         function enterChat(phone, name) {
             currentChatPhone = phone; document.getElementById('main-app').style.display = 'none'; document.getElementById('chat-view').style.display = 'flex';
+            db.ref().off();
             db.ref('status/' + phone).on('value', s => document.getElementById('chat-title').innerText = s.val() ? "Pisze..." : name);
             const myPhone = localStorage.getItem('myPhone');
             const chatId = [myPhone, phone].sort().join('_');
@@ -87,24 +88,29 @@
                     const m = data[key];
                     const isMine = m.from === myPhone;
                     if(!isMine && !m.read) db.ref('chats/' + chatId + '/' + key + '/read').set(true);
-                    const time = new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                    msgsDiv.innerHTML += `<div class="msg ${isMine ? 'sent' : 'received'}">${m.text}<div class="meta">${time} ${isMine ? (m.read ? '✓✓' : '✓') : ''}</div></div>`;
+                    
+                    const div = document.createElement('div');
+                    div.className = `msg ${isMine ? 'sent' : 'received'}`;
+                    div.innerHTML = `${m.text}<div class="meta">${new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} ${isMine ? (m.read ? '✓✓' : '✓') : ''}</div>`;
+                    
+                    // Obsługa gestów
+                    let startX;
+                    div.ontouchstart = e => startX = e.touches[0].clientX;
+                    div.ontouchend = e => {
+                        let diff = startX - e.changedTouches[0].clientX;
+                        if(Math.abs(diff) > 50) {
+                            document.getElementById('msgInput').value = `Odpowiedź: "${m.text.substring(0, 20)}..." `;
+                            document.getElementById('msgInput').focus();
+                        }
+                    };
+                    msgsDiv.appendChild(div);
                 });
                 msgsDiv.scrollTop = msgsDiv.scrollHeight;
             });
         }
 
-        function setTyping(val) { 
-            db.ref('status/' + localStorage.getItem('myPhone')).set(val); 
-            clearTimeout(window.t); window.t = setTimeout(() => db.ref('status/' + localStorage.getItem('myPhone')).set(false), 3000); 
-        }
-
-        function sendMsg() {
-            const text = document.getElementById('msgInput').value; if(!text) return;
-            db.ref('chats/' + [localStorage.getItem('myPhone'), currentChatPhone].sort().join('_')).push({ text, from: localStorage.getItem('myPhone'), timestamp: Date.now(), read: false });
-            document.getElementById('msgInput').value = ''; setTyping(false);
-        }
-
+        function setTyping(val) { db.ref('status/' + localStorage.getItem('myPhone')).set(val); clearTimeout(window.t); window.t = setTimeout(() => db.ref('status/' + localStorage.getItem('myPhone')).set(false), 3000); }
+        function sendMsg() { const text = document.getElementById('msgInput').value; if(!text) return; db.ref('chats/' + [localStorage.getItem('myPhone'), currentChatPhone].sort().join('_')).push({ text, from: localStorage.getItem('myPhone'), timestamp: Date.now(), read: false }); document.getElementById('msgInput').value = ''; setTyping(false); }
         function openModal() { document.getElementById('modal').style.display = 'block'; }
         function saveContact() { db.ref('users/' + localStorage.getItem('myPhone') + '/contacts/' + document.getElementById('newPhone').value).set({name: document.getElementById('newName').value, phone: document.getElementById('newPhone').value}); location.reload(); }
         if (localStorage.getItem('myPhone')) showApp();
