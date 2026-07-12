@@ -36,7 +36,6 @@
         .typing-indicator.active { opacity: 1; }
         .dot { width: 8px; height: 8px; background: var(--text); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; }
         @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
-        /* Nowe style dla odpowiedzi */
         #reply-panel { display: none; background: var(--panel-bg); border-left: 4px solid var(--acc-color); padding: 10px; margin-bottom: 10px; border-radius: 8px; font-size: 13px; }
     </style>
 </head>
@@ -62,7 +61,6 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
         let currentChatPhone, typingTimer, replyingTo = null;
-        const msgSound = new Audio('https://actions.google.com/sounds/v1/notifications/beep_short.ogg');
 
         document.getElementById('messages').addEventListener('scroll', () => { if(document.activeElement.tagName === 'INPUT') document.activeElement.blur(); });
 
@@ -96,27 +94,29 @@
             document.getElementById('chat-view').style.display = 'flex';
             document.getElementById('chat-title').innerText = name;
             cancelReply();
-            setTimeout(() => document.getElementById('msgInput').focus(), 300);
             
+            const msgsDiv = document.getElementById('messages');
+            msgsDiv.innerHTML = '';
             const chatId = [localStorage.getItem('myPhone'), phone].sort().join('_');
-            db.ref('chats/' + chatId).on('value', snap => {
-                const msgsDiv = document.getElementById('messages'); 
-                msgsDiv.innerHTML = '';
-                snap.forEach(child => {
-                    if (child.key === 'typing') return;
-                    const m = child.val();
-                    if (m.from !== localStorage.getItem('myPhone') && !m.read) child.ref.update({ read: true });
-                    const time = new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-                    const status = m.read ? '<i class="fas fa-check-double" style="color:#007aff;"></i>' : '<i class="fas fa-check"></i>';
-                    const div = document.createElement('div');
-                    div.className = `msg ${m.from === localStorage.getItem('myPhone') ? 'sent' : 'received'}`;
-                    div.innerHTML = `${m.replyTo ? `<div style="font-size:10px; opacity:0.7;">Odp: ${m.replyTo}</div>` : ''}${m.text}<span class="timestamp">${time} ${m.from === localStorage.getItem('myPhone') ? status : ''}</span>`;
-                    
-                    let startX;
-                    div.ontouchstart = e => startX = e.touches[0].clientX;
-                    div.ontouchend = e => { if(Math.abs(startX - e.changedTouches[0].clientX) > 50) { replyingTo = m.text; document.getElementById('reply-panel').style.display = 'block'; document.getElementById('reply-preview').innerText = m.text; } };
-                    msgsDiv.appendChild(div);
-                });
+            
+            // Użycie child_added rozwiązuje problem duplikatów i "migotania"
+            db.ref('chats/' + chatId).off(); 
+            db.ref('chats/' + chatId).on('child_added', child => {
+                if (child.key === 'typing') return;
+                const m = child.val();
+                if (m.from !== localStorage.getItem('myPhone') && !m.read) child.ref.update({ read: true });
+                
+                const time = new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                const status = m.read ? '<i class="fas fa-check-double" style="color:#007aff;"></i>' : '<i class="fas fa-check"></i>';
+                const div = document.createElement('div');
+                div.className = `msg ${m.from === localStorage.getItem('myPhone') ? 'sent' : 'received'}`;
+                div.innerHTML = `${m.replyTo ? `<div style="font-size:10px; opacity:0.7;">Odp: ${m.replyTo}</div>` : ''}${m.text}<span class="timestamp">${time} ${m.from === localStorage.getItem('myPhone') ? status : ''}</span>`;
+                
+                let startX;
+                div.ontouchstart = e => startX = e.touches[0].clientX;
+                div.ontouchend = e => { if(Math.abs(startX - e.changedTouches[0].clientX) > 50) { replyingTo = m.text; document.getElementById('reply-panel').style.display = 'block'; document.getElementById('reply-preview').innerText = m.text; } };
+                
+                msgsDiv.appendChild(div);
                 msgsDiv.scrollTop = msgsDiv.scrollHeight;
             });
 
