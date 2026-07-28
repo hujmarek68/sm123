@@ -3,121 +3,638 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0a0d14">
     <link rel="manifest" href="manifest.json">
-    <title>Wiadomości Liquid Glass</title>
+    <title>Wiadomości Liquid Glass Pro</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root { --bg: radial-gradient(circle at 50% -20%, #293650 0%, #0a0d14 70%); --text: #ffffff; --panel-bg: rgba(255, 255, 255, 0.08); --panel-blur: blur(20px) saturate(180%); --panel-border: 1px solid rgba(255, 255, 255, 0.1); --acc-color: #5ac8fa; }
-        body.light { --bg: linear-gradient(180deg, #eef2f5 0%, #ffffff 100%); --text: #1c1c1e; --panel-bg: rgba(255, 255, 255, 0.7); --panel-border: 1px solid rgba(0, 0, 0, 0.05); --acc-color: #007aff; }
-        body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; height: 100vh; overflow: hidden; transition: 0.5s; }
-        #auth-screen, #main-app, #chat-view, #settings-view { padding: 20px; height: 100vh; display: flex; flex-direction: column; box-sizing: border-box; }
-        #main-app, #chat-view, #settings-view { display: none; animation: fadeIn 0.4s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        h1 { font-size: 34px; font-weight: 800; letter-spacing: -1px; margin: 20px 0; }
-        #list { background: var(--panel-bg); backdrop-filter: var(--panel-blur); border-radius: 24px; border: var(--panel-border); overflow: hidden; }
-        .item { padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; cursor: pointer; transition: 0.2s; }
-        .item:active { transform: scale(0.98); background: rgba(255,255,255,0.1); }
+        :root { 
+            --bg: radial-gradient(circle at 50% -20%, #293650 0%, #0a0d14 70%); 
+            --text: #ffffff; 
+            --panel-bg: rgba(255, 255, 255, 0.08); 
+            --panel-blur: blur(25px) saturate(180%); 
+            --panel-border: 1px solid rgba(255, 255, 255, 0.12); 
+            --acc-color: #5ac8fa; 
+            --online: #34c759;
+        }
+        body.light { 
+            --bg: linear-gradient(180deg, #eef2f5 0%, #ffffff 100%); 
+            --text: #1c1c1e; 
+            --panel-bg: rgba(255, 255, 255, 0.75); 
+            --panel-border: 1px solid rgba(0, 0, 0, 0.08); 
+            --acc-color: #007aff; 
+            --online: #34c759;
+        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; height: 100vh; overflow: hidden; transition: background 0.5s; }
+        
+        #auth-screen, #main-app, #chat-view, #settings-view { padding: 20px; height: 100vh; display: flex; flex-direction: column; position: absolute; top: 0; left: 0; width: 100%; box-sizing: border-box; }
+        #main-app, #chat-view, #settings-view { display: none; animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); background: inherit; z-index: 2; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+        
+        h1 { font-size: 32px; font-weight: 800; letter-spacing: -1px; margin: 15px 0; }
+        
+        .search-box { width: 100%; padding: 12px 18px; border-radius: 16px; border: var(--panel-border); background: var(--panel-bg); backdrop-filter: var(--panel-blur); color: var(--text); font-size: 15px; margin-bottom: 10px; outline: none; }
+        
+        #list { background: var(--panel-bg); backdrop-filter: var(--panel-blur); border-radius: 24px; border: var(--panel-border); overflow-y: auto; flex-grow: 1; margin-bottom: 20px; }
+        .item { padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: 0.2s; }
+        .item:active { background: rgba(255,255,255,0.1); }
+        .item-left { display: flex; align-items: center; gap: 14px; }
+        .avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--acc-color); display: flex; align-items: center; justify-content: center; font-weight: 700; color: white; font-size: 18px; position: relative; flex-shrink: 0; }
+        .status-dot { width: 12px; height: 12px; border-radius: 50%; background: #8e8e93; border: 2px solid #0a0d14; position: absolute; bottom: 0; right: 0; }
+        .status-dot.active { background: var(--online); }
         .item-title { font-size: 17px; font-weight: 700; }
-        .fab { position: fixed; bottom: 30px; right: 30px; background: var(--acc-color); width: 64px; height: 64px; border-radius: 32px; color: white; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 20px rgba(0,0,0,0.3); transition: 0.2s; }
+        .item-sub { font-size: 13px; opacity: 0.6; margin-top: 2px; }
+        
+        .fab { position: fixed; bottom: 30px; right: 30px; background: var(--acc-color); width: 60px; height: 60px; border-radius: 30px; color: white; display: flex; align-items: center; justify-content: center; box-shadow: 0 12px 24px rgba(0,0,0,0.3); transition: 0.2s; cursor: pointer; z-index: 10; font-size: 22px; }
         .fab:active { transform: scale(0.9); }
-        .msg { max-width: 80%; padding: 10px 14px; border-radius: 20px; position: relative; backdrop-filter: blur(10px); margin-bottom: 8px; font-size: 15px; display: block; word-wrap: break-word; overflow-wrap: break-word; line-height: 1.4; }
-        .timestamp { font-size: 10px; opacity: 0.7; display: block; text-align: right; margin-top: 4px; }
-        .sent { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: #000; align-self: flex-end; }
-        .received { background: var(--panel-bg); align-self: flex-start; border: var(--panel-border); }
-        input { padding: 14px; border-radius: 20px; border: none; background: rgba(255,255,255,0.1); color: var(--text); }
-        button { padding: 14px; background: var(--acc-color); color: white; border: none; border-radius: 20px; font-weight: 700; cursor: pointer; }
-        .gear-icon { position: absolute; top: 25px; right: 25px; cursor: pointer; font-size: 28px; transition: 0.3s; color: var(--text); }
+        
+        .msg { max-width: 80%; padding: 12px 16px; border-radius: 20px; position: relative; backdrop-filter: blur(10px); margin-bottom: 10px; font-size: 15px; display: block; word-wrap: break-word; line-height: 1.4; animation: popIn 0.2s cubic-bezier(0.17, 0.88, 0.32, 1.27); }
+        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .timestamp { font-size: 10px; opacity: 0.7; display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; float: right; margin-top: 4px; }
+        .sent { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: #000; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .received { background: var(--panel-bg); align-self: flex-start; border: var(--panel-border); border-bottom-left-radius: 4px; }
+        
+        .msg-img { max-width: 100%; border-radius: 12px; margin-bottom: 6px; cursor: pointer; display: block; }
+
+        input[type="text"] { padding: 14px 18px; border-radius: 18px; border: var(--panel-border); background: var(--panel-bg); color: var(--text); outline: none; font-size: 15px; }
+        button { padding: 14px; background: var(--acc-color); color: white; border: none; border-radius: 18px; font-weight: 700; cursor: pointer; transition: transform 0.1s; }
+        button:active { transform: scale(0.96); }
+        
+        .gear-icon { position: absolute; top: 25px; right: 25px; cursor: pointer; font-size: 26px; transition: 0.3s; color: var(--text); z-index: 5; }
         .gear-icon:hover { transform: rotate(90deg); }
-        #modal { transition: 0.3s cubic-bezier(0.17, 0.88, 0.32, 1.27); transform: scale(0.9); opacity: 0; pointer-events: none; }
-        #modal.show { transform: scale(1); opacity: 1; pointer-events: auto; }
-        .typing-indicator { position: absolute; bottom: 110px; left: 20px; display: flex; gap: 4px; padding: 10px; background: var(--panel-bg); border-radius: 20px; opacity: 0; transition: 0.3s; z-index: 10; }
+        
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; transition: 0.3s; opacity: 0; pointer-events: none; z-index: 100; }
+        .modal.show { opacity: 1; pointer-events: auto; }
+        .modal-content { background: var(--panel-bg); backdrop-filter: var(--panel-blur); border: var(--panel-border); padding: 24px; border-radius: 28px; width: 85%; max-width: 400px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); max-height: 80vh; overflow-y: auto; }
+        
+        .typing-indicator { display: flex; gap: 4px; padding: 10px 14px; background: var(--panel-bg); border-radius: 20px; width: fit-content; opacity: 0; transition: 0.3s; margin-bottom: 10px; border: var(--panel-border); }
         .typing-indicator.active { opacity: 1; }
-        .dot { width: 8px; height: 8px; background: var(--text); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; }
+        .dot { width: 7px; height: 7px; background: var(--text); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; }
+        .dot:nth-child(2) { animation-delay: 0.2s; }
+        .dot:nth-child(3) { animation-delay: 0.4s; }
         @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
-        #reply-panel { display: none; background: var(--panel-bg); border-left: 4px solid var(--acc-color); padding: 10px; margin-bottom: 10px; border-radius: 8px; font-size: 13px; }
-        #toast { position: fixed; bottom: 30px; left: 10%; width: 80%; background: #ff3b30; color: white; padding: 15px; border-radius: 20px; text-align: center; transform: translateY(100px); opacity: 0; transition: 0.4s cubic-bezier(0.17, 0.88, 0.32, 1.27); z-index: 99; pointer-events: none; font-weight: 600; box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
+        
+        #reply-panel { display: none; background: var(--panel-bg); border-left: 4px solid var(--acc-color); padding: 10px 14px; margin-bottom: 10px; border-radius: 12px; font-size: 13px; backdrop-filter: var(--panel-blur); }
+        
+        #toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); background: #ff3b30; color: white; padding: 12px 24px; border-radius: 20px; text-align: center; opacity: 0; transition: 0.4s cubic-bezier(0.17, 0.88, 0.32, 1.27); z-index: 999; font-weight: 600; box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
+        #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
     </style>
 </head>
 <body>
-    <div id="toast">Najpierw wpisz dane</div>
-    <div id="auth-screen" style="display:flex;"><h2>Logowanie</h2><input type="text" id="username" placeholder="Nazwa"><input type="text" id="phone" placeholder="Numer telefonu"><button onclick="login()">Zaloguj się</button></div>
-    <div id="main-app"><i class="fas fa-cog gear-icon" onclick="showSettings()"></i><h1>Wiadomości</h1><div id="list"></div><div class="fab" onclick="toggleModal(true)">+</div></div>
-    <div id="settings-view"><button onclick="hideSettings()" style="width: 80px; background:transparent; border:none; color:var(--acc-color);">← Wstecz</button><h2>Ustawienia</h2><p id="user-info" style="text-align: center;"></p><button onclick="toggleTheme()" style="width:100%;">Przełącz motyw</button></div>
-    <div id="chat-view">
-        <button onclick="exitChat()" style="width: 80px; background:transparent; border:none; color:var(--acc-color);">← Wstecz</button>
-        <h2 id="chat-title"></h2>
-        <div id="typing-indicator" class="typing-indicator"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
-        <div id="messages" style="flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; padding: 10px 0;"></div>
-        <div id="reply-panel">
-            <span onclick="cancelReply()" style="float:right; cursor:pointer;">✕</span>
-            <div id="reply-preview" style="color:var(--acc-color);"></div>
+    <div id="toast">Komunikat</div>
+
+    <div id="auth-screen">
+        <div style="margin: auto; width: 100%; max-width: 380px; text-align: center;">
+            <div style="font-size: 64px; color: var(--acc-color); margin-bottom: 20px;"><i class="fas fa-comments"></i></div>
+            <h1>Liquid Glass Pro</h1>
+            <p style="opacity: 0.6; margin-bottom: 30px;">Bezpieczny komunikator w czasie rzeczywistym</p>
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+                <input type="text" id="username" placeholder="Twoje imię / nazwa">
+                <input type="text" id="phone" placeholder="Twój unikalny numer (np. 12345)">
+                <button onclick="login()">Rozpocznij czat</button>
+            </div>
         </div>
-        <div style="display: flex; gap: 10px;"><input type="text" id="msgInput" placeholder="Napisz..." style="flex-grow: 1;" oninput="setTyping()"><button onclick="sendMsg()">Wyślij</button></div>
     </div>
-    <div id="modal" style="position:fixed; top:20%; left:10%; width:80%; background:var(--panel-bg); backdrop-filter:blur(20px); padding:20px; border-radius:24px; border:var(--panel-border);"><h3>Dodaj kontakt</h3><input type="text" id="newName" placeholder="Nazwa" style="width:100%; margin-bottom:10px;"><input type="text" id="newPhone" placeholder="Numer" style="width:100%; margin-bottom:10px;"><button onclick="saveContact()" style="width:100%;">Dodaj</button></div>
+
+    <div id="main-app">
+        <i class="fas fa-cog gear-icon" onclick="showSettings()"></i>
+        <h1>Wiadomości</h1>
+        <input type="text" class="search-box" id="searchContact" placeholder="Szukaj kontaktu lub grupy..." oninput="filterContacts()">
+        <button onclick="toggleGroupModal(true)" style="width:100%; margin-bottom:10px; background:var(--panel-bg); border:var(--panel-border); color:var(--text); display:flex; align-items:center; justify-content:center; gap:8px;">
+            <i class="fas fa-users" style="color:var(--acc-color);"></i> Utwórz nową grupę
+        </button>
+        <div id="list"></div>
+        <div class="fab" onclick="toggleContactModal(true)"><i class="fas fa-user-plus"></i></div>
+    </div>
+
+    <div id="settings-view">
+        <button onclick="hideSettings()" style="width: 80px; background:transparent; color:var(--acc-color); margin-bottom: 20px;"><i class="fas fa-arrow-left"></i> Wstecz</button>
+        <h1>Ustawienia</h1>
+        <div style="background: var(--panel-bg); backdrop-filter: var(--panel-blur); border: var(--panel-border); border-radius: 20px; padding: 20px; margin-bottom: 20px;">
+            <p id="user-info" style="margin: 0; line-height: 1.6; font-size: 16px;"></p>
+        </div>
+        <button onclick="toggleTheme()" style="width:100%; margin-bottom: 12px;"><i class="fas fa-adjust"></i> Przełącz motyw</button>
+        <button onclick="logout()" style="width:100%; background: #ff3b30;"><i class="fas fa-sign-out-alt"></i> Wyloguj się</button>
+    </div>
+
+    <div id="chat-view">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+            <button onclick="exitChat()" style="background:transparent; color:var(--acc-color); padding: 8px;"><i class="fas fa-arrow-left fa-lg"></i></button>
+            <div id="chat-header-info" onclick="openChatInfo()" style="display: flex; align-items: center; gap: 10px; cursor: pointer; flex-grow: 1; justify-content: center;">
+                <div class="avatar" id="chat-header-avatar" style="width:36px; height:36px; font-size:14px;"></div>
+                <div>
+                    <h2 id="chat-title" style="margin: 0; font-size: 17px; line-height: 1.2;"></h2>
+                    <div id="chat-subtitle" style="font-size: 11px; opacity: 0.7;">Kliknij po szczegóły</div>
+                </div>
+            </div>
+            <div style="width: 40px;"></div>
+        </div>
+        
+        <div id="messages" style="flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; padding: 10px 0; scroll-behavior: smooth;"></div>
+        
+        <div id="typing-indicator" class="typing-indicator">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+
+        <div id="reply-panel">
+            <span onclick="cancelReply()" style="float:right; cursor:pointer; font-weight: bold;">✕</span>
+            <div style="font-size: 11px; opacity: 0.7;">Odpowiadasz na:</div>
+            <div id="reply-preview" style="color:var(--acc-color); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></div>
+        </div>
+
+        <div style="display: flex; gap: 8px; align-items: center; padding-top: 6px;">
+            <label style="cursor: pointer; font-size: 20px; color: var(--acc-color); padding: 10px;">
+                <i class="fas fa-image"></i>
+                <input type="file" accept="image/*" id="imageInput" style="display: none;" onchange="sendImage(this)">
+            </label>
+            <input type="text" id="msgInput" placeholder="Napisz wiadomość..." style="flex-grow: 1;" oninput="setTyping()" onkeypress="if(event.key==='Enter') sendMsg()">
+            <button onclick="sendMsg()"><i class="fas fa-paper-plane"></i></button>
+        </div>
+    </div>
+
+    <div id="contact-modal" class="modal">
+        <div class="modal-content">
+            <h3 style="margin-top: 0;">Dodaj kontakt</h3>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <input type="text" id="newName" placeholder="Nazwa kontaktu">
+                <input type="text" id="newPhone" placeholder="Numer telefonu">
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button onclick="toggleContactModal(false)" style="flex: 1; background: rgba(255,255,255,0.1);">Anuluj</button>
+                    <button onclick="saveContact()" style="flex: 1;">Zapisz</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="group-modal" class="modal">
+        <div class="modal-content">
+            <h3 style="margin-top: 0;"><i class="fas fa-users" style="color:var(--acc-color);"></i> Nowa grupa</h3>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <input type="text" id="groupNameInput" placeholder="Nazwa grupy">
+                <p style="font-size: 13px; opacity: 0.7; margin: 0;">Wybierz członków grupy:</p>
+                <div id="group-contacts-list" style="max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.1); padding: 8px; border-radius: 12px;"></div>
+                <div style="display: flex; gap: 10px; margin-top: 5px;">
+                    <button onclick="toggleGroupModal(false)" style="flex: 1; background: rgba(255,255,255,0.1);">Anuluj</button>
+                    <button onclick="createGroup()" style="flex: 1;">Utwórz</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="profile-modal" class="modal">
+        <div class="modal-content" style="padding: 0; overflow: hidden; max-width: 420px; background: rgba(15, 20, 30, 0.96); border: var(--panel-border);">
+            <div style="display: flex; align-items: center; padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); gap: 16px;">
+                <i class="fas fa-arrow-left" style="cursor: pointer; font-size: 18px; color: var(--acc-color);" onclick="toggleProfileModal(false)"></i>
+                <span id="profile-modal-title" style="font-weight: 600; font-size: 17px;">Informacje</span>
+            </div>
+            
+            <div style="max-height: calc(80vh - 60px); overflow-y: auto; padding: 24px 20px;">
+                <div style="text-align: center;">
+                    <div id="profile-avatar" class="avatar" style="width: 90px; height: 90px; font-size: 36px; margin: 0 auto 12px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.5);"></div>
+                    <h3 id="profile-name" style="margin: 0 0 5px 0; font-size: 20px; font-weight: 700;"></h3>
+                    <p id="profile-subtitle" style="font-size: 14px; opacity: 0.6; margin: 0 0 16px 0;"></p>
+                </div>
+                
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); padding: 14px; border-radius: 14px; margin-bottom: 20px;">
+                    <div style="font-size: 11px; opacity: 0.5; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">Opis / Status</div>
+                    <div id="profile-desc-text" style="font-size: 14px; line-height: 1.4; word-break: break-word;">-</div>
+                </div>
+
+                <div id="profile-members-section" style="display: none;">
+                    <div id="profile-members-count-label" style="font-size: 12px; opacity: 0.5; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Członkowie grupy</div>
+                    <div id="profile-members-list" style="display: flex; flex-direction: column; gap: 6px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 14px; padding: 8px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="member-action-modal" class="modal">
+        <div class="modal-content" style="max-width: 320px; text-align: center;">
+            <h3 id="member-action-title" style="margin-top: 0; font-size: 18px;">Zarządzaj członkiem</h3>
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+                <button id="btn-toggle-admin" onclick="actionToggleAdmin()" style="background: var(--acc-color); width: 100%;">Mianuj administratorem</button>
+                <button id="btn-remove-member" onclick="actionRemoveMember()" style="background: #ff3b30; width: 100%;">Usuń z grupy</button>
+                <button onclick="toggleMemberActionModal(false)" style="background: rgba(255,255,255,0.1); width: 100%;">Anuluj</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         const firebaseConfig = { apiKey: "AIzaSyAetQLNfeS69hofKicFsN_BeaqslnL9Ows", authDomain: "sms123-454d3.firebaseapp.com", databaseURL: "https://sms123-454d3-default-rtdb.firebaseio.com", projectId: "sms123-454d3", storageBucket: "sms123-454d3.firebasestorage.app", messagingSenderId: "607529107448", appId: "1:607529107448:web:7ae2547a16af919cc5a00d", measurementId: "G-RK0TP4NDV1" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-        let currentChatPhone, typingTimer, replyingTo = null;
-
-        function showToast() { const t = document.getElementById('toast'); t.style.transform = 'translateY(0)'; t.style.opacity = '1'; setTimeout(() => { t.style.transform = 'translateY(100px)'; t.style.opacity = '0'; }, 2500); }
-        function vibrate() { if(navigator.vibrate) navigator.vibrate(30); }
-        function toggleModal(show) { document.getElementById('modal').className = show ? 'show' : ''; }
-        function login() { const n = document.getElementById('username').value; const p = document.getElementById('phone').value; if(!n || !p) return; db.ref('users/' + p).set({name: n, phone: p}).then(() => { localStorage.setItem('myPhone', p); localStorage.setItem('myName', n); showApp(); }); }
-        function toggleTheme() { document.body.classList.toggle('light'); }
-        function showSettings() { document.getElementById('main-app').style.display = 'none'; document.getElementById('settings-view').style.display = 'flex'; document.getElementById('user-info').innerText = "Nazwa: " + (localStorage.getItem('myName') || "Brak") + "\nNumer: " + localStorage.getItem('myPhone'); }
-        function hideSettings() { document.getElementById('settings-view').style.display = 'none'; document.getElementById('main-app').style.display = 'flex'; }
-        function showApp() { document.getElementById('auth-screen').style.display = 'none'; document.getElementById('main-app').style.display = 'flex'; renderContacts(); }
         
-        function renderContacts() {
+        let currentChatId, currentChatPhone, currentGroupName, isGroupChat = false, typingTimer, replyingTo = null;
+        let allContacts = {}, allGroups = {};
+        let selectedMemberPhone = null;
+
+        function playNotificationSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.2);
+            } catch(e) {}
+        }
+
+        function showToast(text) { 
+            const t = document.getElementById('toast'); 
+            t.innerText = text;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2500); 
+        }
+
+        function vibrate() { if(navigator.vibrate) navigator.vibrate(30); }
+        function toggleContactModal(show) { document.getElementById('contact-modal').className = show ? 'modal show' : 'modal'; }
+        function toggleProfileModal(show) { document.getElementById('profile-modal').className = show ? 'modal show' : 'modal'; }
+        function toggleMemberActionModal(show) { document.getElementById('member-action-modal').className = show ? 'modal show' : 'modal'; }
+        function toggleTheme() { document.body.classList.toggle('light'); }
+
+        function toggleGroupModal(show) {
+            document.getElementById('group-modal').className = show ? 'modal show' : 'modal';
+            if(show) {
+                const container = document.getElementById('group-contacts-list');
+                container.innerHTML = '';
+                const keys = Object.keys(allContacts);
+                if(keys.length === 0) {
+                    container.innerHTML = '<div style="font-size:13px; opacity:0.5; text-align:center; padding:10px;">Brak kontaktów</div>';
+                    return;
+                }
+                keys.forEach(phone => {
+                    const c = allContacts[phone];
+                    container.insertAdjacentHTML('beforeend', `
+                        <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:14px; padding:4px;">
+                            <input type="checkbox" value="${phone}" class="group-member-checkbox" style="width:18px; height:18px;">
+                            <span>${c.name} (${c.phone})</span>
+                        </label>
+                    `);
+                });
+            }
+        }
+
+        function login() { 
+            const n = document.getElementById('username').value.trim(); 
+            const p = document.getElementById('phone').value.trim(); 
+            if(!n || !p) { showToast('Uzupełnij wszystkie pola'); return; }
+            
+            db.ref('users/' + p).set({name: n, phone: p, online: true}).then(() => { 
+                localStorage.setItem('myPhone', p); 
+                localStorage.setItem('myName', n); 
+                showApp(); 
+            }); 
+        }
+
+        function logout() {
+            const p = localStorage.getItem('myPhone');
+            if(p) db.ref('users/' + p + '/online').set(false);
+            localStorage.clear();
+            location.reload();
+        }
+
+        function showSettings() { 
+            document.getElementById('main-app').style.display = 'none'; 
+            document.getElementById('settings-view').style.display = 'flex'; 
+            document.getElementById('user-info').innerHTML = `<b>Nazwa:</b> ${localStorage.getItem('myName') || 'Brak'}<br><b>Numer:</b> ${localStorage.getItem('myPhone')}`; 
+        }
+        
+        function hideSettings() { 
+            document.getElementById('settings-view').style.display = 'none'; 
+            document.getElementById('main-app').style.display = 'flex'; 
+        }
+
+        function showApp() { 
+            document.getElementById('auth-screen').style.display = 'none'; 
+            document.getElementById('main-app').style.display = 'flex'; 
+            
+            const myPhone = localStorage.getItem('myPhone');
+            const userStatusRef = db.ref('users/' + myPhone + '/online');
+            userStatusRef.set(true);
+            userStatusRef.onDisconnect().set(false);
+
+            renderContactsAndGroups(); 
+        }
+
+        function renderContactsAndGroups() {
             db.ref().off();
-            db.ref('users/' + localStorage.getItem('myPhone') + '/contacts').on('value', snap => {
-                const list = document.getElementById('list'); 
-                if(!snap.val()) { list.innerHTML = '<div style="padding:40px; text-align:center; opacity:0.5;"><i class="fas fa-comments" style="font-size:40px;"></i><p>Brak kontaktów</p></div>'; return; }
-                list.innerHTML = '';
-                Object.values(snap.val() || {}).forEach(c => {
-                    list.innerHTML += `<div class="item" onclick="enterChat('${c.phone}', '${c.name}')"><div class="item-title">${c.name}</div></div>`;
+            const myPhone = localStorage.getItem('myPhone');
+
+            db.ref('users/' + myPhone + '/contacts').on('value', snapContacts => {
+                allContacts = snapContacts.val() || {};
+                db.ref('users/' + myPhone + '/groups').on('value', snapGroups => {
+                    const groupIds = snapGroups.val() || {};
+                    const groupPromises = Object.keys(groupIds).map(gId => {
+                        return db.ref('groups/' + gId).once('value').then(s => ({ id: gId, ...s.val() }));
+                    });
+                    
+                    Promise.all(groupPromises).then(groupsArray => {
+                        allGroups = {};
+                        groupsArray.forEach(g => { if(g.name) allGroups[g.id] = g; });
+                        displayList(allContacts, allGroups);
+                    });
                 });
             });
         }
 
+        function displayList(contacts, groups) {
+            const list = document.getElementById('list'); 
+            const contactKeys = Object.keys(contacts);
+            const groupKeys = Object.keys(groups);
+            
+            if(contactKeys.length === 0 && groupKeys.length === 0) { 
+                list.innerHTML = '<div style="padding:40px; text-align:center; opacity:0.5;"><i class="fas fa-comments" style="font-size:40px; margin-bottom:10px;"></i><p>Brak kontaktów i grup.</p></div>'; 
+                return; 
+            }
+            
+            list.innerHTML = '';
+
+            groupKeys.forEach(gId => {
+                const g = groups[gId];
+                const groupHTML = `
+                    <div class="item" onclick="enterGroupChat('${gId}', '${g.name}')">
+                        <div class="item-left">
+                            <div class="avatar" style="background:linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%); color:#000;"><i class="fas fa-users"></i></div>
+                            <div>
+                                <div class="item-title">${g.name}</div>
+                                <div class="item-sub">Grupa (${Object.keys(g.members || {}).length} os.)</div>
+                            </div>
+                        </div>
+                        <i class="fas fa-chevron-right" style="opacity:0.3; font-size:14px;"></i>
+                    </div>`;
+                list.insertAdjacentHTML('beforeend', groupHTML);
+            });
+
+            contactKeys.forEach(phone => {
+                const c = contacts[phone];
+                db.ref('users/' + c.phone + '/online').once('value', sSnap => {
+                    const isOnline = sSnap.val();
+                    const itemHTML = `
+                        <div class="item" onclick="enterChat('${c.phone}', '${c.name}')">
+                            <div class="item-left">
+                                <div class="avatar">${c.name.charAt(0).toUpperCase()}
+                                    <div class="status-dot ${isOnline ? 'active' : ''}"></div>
+                                </div>
+                                <div>
+                                    <div class="item-title">${c.name}</div>
+                                    <div class="item-sub">${c.phone}</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-right" style="opacity:0.3; font-size:14px;"></i>
+                        </div>`;
+                    list.insertAdjacentHTML('beforeend', itemHTML);
+                });
+            });
+        }
+
+        function filterContacts() {
+            const query = document.getElementById('searchContact').value.toLowerCase();
+            const filteredC = {};
+            const filteredG = {};
+            
+            Object.keys(allContacts).forEach(k => {
+                const c = allContacts[k];
+                if(c.name.toLowerCase().includes(query) || c.phone.includes(query)) filteredC[k] = c;
+            });
+            Object.keys(allGroups).forEach(k => {
+                const g = allGroups[k];
+                if(g.name.toLowerCase().includes(query)) filteredG[k] = g;
+            });
+            displayList(filteredC, filteredG);
+        }
+
         function enterChat(phone, name) {
-            currentChatPhone = phone; 
+            isGroupChat = false;
+            currentChatPhone = phone;
+            currentChatId = [localStorage.getItem('myPhone'), phone].sort().join('_');
+            currentGroupName = name;
+            
             document.getElementById('main-app').style.display = 'none'; 
             document.getElementById('chat-view').style.display = 'flex';
             document.getElementById('chat-title').innerText = name;
+            document.getElementById('chat-subtitle').innerText = 'Kliknij po szczegóły profilu';
+            
+            const avatar = document.getElementById('chat-header-avatar');
+            avatar.style.background = 'var(--acc-color)';
+            avatar.style.color = '#fff';
+            avatar.innerHTML = name.charAt(0).toUpperCase();
+
+            setupChatListeners();
+        }
+
+        function enterGroupChat(groupId, groupName) {
+            isGroupChat = true;
+            currentChatId = groupId;
+            currentGroupName = groupName;
+            currentChatPhone = null;
+
+            document.getElementById('main-app').style.display = 'none'; 
+            document.getElementById('chat-view').style.display = 'flex';
+            document.getElementById('chat-title').innerText = groupName;
+            document.getElementById('chat-subtitle').innerText = 'Czat grupowy (kliknij po listę)';
+
+            const avatar = document.getElementById('chat-header-avatar');
+            avatar.style.background = 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%)';
+            avatar.style.color = '#000';
+            avatar.innerHTML = '<i class="fas fa-users"></i>';
+
+            setupChatListeners();
+        }
+
+        function openChatInfo() {
+            if(!isGroupChat) {
+                document.getElementById('profile-modal-title').innerText = "Informacje o kontakcie";
+                document.getElementById('profile-members-section').style.display = 'none';
+                db.ref('users/' + currentChatPhone).once('value', snap => {
+                    const data = snap.val() || { name: currentGroupName, phone: currentChatPhone, online: false };
+                    document.getElementById('profile-avatar').innerText = data.name.charAt(0).toUpperCase();
+                    document.getElementById('profile-name').innerText = data.name;
+                    document.getElementById('profile-subtitle').innerText = "Tel: " + data.phone;
+                    document.getElementById('profile-desc-text').innerText = data.online ? "Online (Aktywny)" : "Offline";
+                    toggleProfileModal(true);
+                });
+            } else {
+                document.getElementById('profile-modal-title').innerText = "Informacje o grupie";
+                
+                db.ref('groups/' + currentChatId).once('value', snap => {
+                    const group = snap.val();
+                    if(!group) return;
+                    allGroups[currentChatId] = group;
+
+                    const membersObj = group.members || {};
+                    const membersCount = Object.keys(membersObj).length;
+                    
+                    document.getElementById('profile-avatar').innerHTML = '<i class="fas fa-users"></i>';
+                    document.getElementById('profile-avatar').style.background = 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%)';
+                    document.getElementById('profile-avatar').style.color = '#000';
+                    document.getElementById('profile-name').innerText = group.name;
+                    document.getElementById('profile-subtitle').innerText = `Grupa · ${membersCount} członków`;
+                    document.getElementById('profile-desc-text').innerText = group.description || "Brak opisu grupy.";
+
+                    const membersSection = document.getElementById('profile-members-section');
+                    const membersListDiv = document.getElementById('profile-members-list');
+                    membersSection.style.display = 'block';
+                    membersListDiv.innerHTML = '';
+
+                    const myPhone = localStorage.getItem('myPhone');
+                    const isCurrentAdmin = (group.admins && group.admins[myPhone]) || group.creator === myPhone;
+
+                    Object.keys(membersObj).forEach(mPhone => {
+                        db.ref('users/' + mPhone).once('value', userSnap => {
+                            const uData = userSnap.val() || { name: mPhone, phone: mPhone };
+                            const isAdmin = (group.admins && group.admins[mPhone]) || group.creator === mPhone;
+                            const isCreator = group.creator === mPhone;
+                            const isMe = mPhone === myPhone;
+
+                            let badgeText = '';
+                            if (isCreator) badgeText = '<span style="font-size:11px; background:rgba(90,200,250,0.2); color:var(--acc-color); padding:2px 6px; border-radius:6px; margin-left:6px;">Założyciel</span>';
+                            else if (isAdmin) badgeText = '<span style="font-size:11px; background:rgba(52,199,89,0.2); color:var(--online); padding:2px 6px; border-radius:6px; margin-left:6px;">Administrator</span>';
+
+                            const item = document.createElement('div');
+                            item.style.cssText = 'display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border-radius:10px; cursor:pointer;';
+                            item.onmouseover = () => item.style.background = 'rgba(255,255,255,0.05)';
+                            item.onmouseout = () => item.style.background = 'transparent';
+                            
+                            item.innerHTML = `
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    <div class="avatar" style="width:36px; height:36px; font-size:14px;">${uData.name.charAt(0).toUpperCase()}</div>
+                                    <div>
+                                        <div style="font-size:15px; font-weight:600;">${isMe ? 'Ty' : uData.name} ${badgeText}</div>
+                                        <div style="font-size:12px; opacity:0.6;">${uData.phone}</div>
+                                    </div>
+                                </div>
+                                ${isCurrentAdmin && !isMe ? '<i class="fas fa-ellipsis-v" style="opacity:0.5; padding:6px;"></i>' : ''}
+                            `;
+
+                            if(isCurrentAdmin && !isMe) {
+                                item.onclick = () => openMemberActionModal(mPhone, uData.name, isAdmin);
+                            }
+
+                            membersListDiv.appendChild(item);
+                        });
+                    });
+
+                    toggleProfileModal(true);
+                });
+            }
+        }
+
+        function openMemberActionModal(phone, name, isAdmin) {
+            selectedMemberPhone = phone;
+            document.getElementById('member-action-title').innerText = name;
+            const btnAdmin = document.getElementById('btn-toggle-admin');
+            btnAdmin.innerText = isAdmin ? "Odbierz uprawnienia admina" : "Mianuj administratorem";
+            toggleMemberActionModal(true);
+        }
+
+        function actionToggleAdmin() {
+            if(!selectedMemberPhone) return;
+            const groupRef = db.ref('groups/' + currentChatId);
+            groupRef.once('value', snap => {
+                const group = snap.val();
+                if(!group) return;
+                
+                if(!group.admins) group.admins = {};
+                const isAdmin = group.admins[selectedMemberPhone];
+
+                if(isAdmin) {
+                    delete group.admins[selectedMemberPhone];
+                    showToast('Odebrano uprawnienia admina');
+                } else {
+                    group.admins[selectedMemberPhone] = true;
+                    showToast('Nadano uprawnienia admina');
+                }
+
+                groupRef.update({ admins: group.admins }).then(() => {
+                    toggleMemberActionModal(false);
+                    openChatInfo();
+                });
+            });
+        }
+
+        function actionRemoveMember() {
+            if(!selectedMemberPhone) return;
+            if(!confirm('Czy na pewno chcesz usunąć tę osobę z grupy?')) return;
+
+            const groupRef = db.ref('groups/' + currentChatId);
+            groupRef.once('value', snap => {
+                const group = snap.val();
+                if(!group) return;
+
+                if(group.members) delete group.members[selectedMemberPhone];
+                if(group.admins) delete group.admins[selectedMemberPhone];
+
+                const updates = {};
+                updates['groups/' + currentChatId] = group;
+                updates['users/' + selectedMemberPhone + '/groups/' + currentChatId] = null;
+
+                db.ref().update(updates).then(() => {
+                    toggleMemberActionModal(false);
+                    showToast('Usunięto członka z grupy');
+                    openChatInfo();
+                });
+            });
+        }
+
+        function setupChatListeners() {
             cancelReply();
             const msgsDiv = document.getElementById('messages');
             msgsDiv.innerHTML = '';
-            const chatId = [localStorage.getItem('myPhone'), phone].sort().join('_');
             const myPhone = localStorage.getItem('myPhone');
             
-            db.ref('chats/' + chatId).off(); 
-            db.ref('chats/' + chatId).on('child_added', child => {
+            db.ref('chats/' + currentChatId).off(); 
+            db.ref('chats/' + currentChatId).on('child_added', child => {
                 if (child.key === 'typing') return;
                 const m = child.val();
-                if (m.from !== myPhone && !m.read) child.ref.update({ read: true });
+                
+                if (m.from !== myPhone && !m.read) {
+                    child.ref.update({ read: true });
+                    playNotificationSound();
+                    vibrate();
+                }
                 
                 const time = new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
                 const status = m.read ? '<i class="fas fa-check-double" style="color:#007aff;"></i>' : '<i class="fas fa-check"></i>';
+                
                 const div = document.createElement('div');
                 div.id = 'msg-' + child.key;
                 div.className = `msg ${m.from === myPhone ? 'sent' : 'received'}`;
-                div.innerHTML = `${m.replyTo ? `<div style="font-size:10px; opacity:0.7; margin-bottom:4px;">Odp: ${m.replyTo}</div>` : ''}${m.text}<span class="timestamp">${time} ${m.from === myPhone ? status : ''}</span>`;
                 
+                let contentHTML = '';
+                if(isGroupChat && m.from !== myPhone && allContacts[m.from]) {
+                    contentHTML += `<div style="font-size:11px; font-weight:700; color:var(--acc-color); margin-bottom:2px;">${allContacts[m.from].name}</div>`;
+                }
+                if(m.replyTo) contentHTML += `<div style="font-size:11px; opacity:0.7; margin-bottom:4px; border-left: 2px solid currentColor; padding-left: 6px;">Odp: ${m.replyTo}</div>`;
+                if(m.image) contentHTML += `<img src="${m.image}" class="msg-img" onclick="window.open(this.src)">`;
+                if(m.text) contentHTML += `<span>${m.text}</span>`;
+                
+                contentHTML += `<span class="timestamp">${time} ${m.from === myPhone ? status : ''}</span>`;
+                div.innerHTML = contentHTML;
+
                 let startX;
                 div.ontouchstart = e => startX = e.touches[0].clientX;
-                div.ontouchend = e => { if(Math.abs(startX - e.changedTouches[0].clientX) > 50) { replyingTo = m.text; document.getElementById('reply-panel').style.display = 'block'; document.getElementById('reply-preview').innerText = m.text; } };
-                
+                div.ontouchend = e => { 
+                    if(Math.abs(startX - e.changedTouches[0].clientX) > 50) { 
+                        replyingTo = m.text || '[Obrazek]'; 
+                        document.getElementById('reply-panel').style.display = 'block'; 
+                        document.getElementById('reply-preview').innerText = replyingTo; 
+                    } 
+                };
+
                 msgsDiv.appendChild(div);
                 msgsDiv.scrollTop = msgsDiv.scrollHeight;
             });
 
-            db.ref('chats/' + chatId).on('child_changed', child => {
+            db.ref('chats/' + currentChatId).on('child_changed', child => {
                 const m = child.val();
                 const msgDiv = document.getElementById('msg-' + child.key);
                 if (msgDiv && m.read) {
@@ -126,16 +643,129 @@
                 }
             });
 
-            db.ref('chats/' + chatId + '/typing').on('value', snap => {
-                document.getElementById('typing-indicator').className = 'typing-indicator ' + (snap.val() && snap.val() !== myPhone ? 'active' : '');
+            db.ref('chats/' + currentChatId + '/typing').on('value', snap => {
+                const isTyping = snap.val() && snap.val() !== myPhone;
+                document.getElementById('typing-indicator').className = 'typing-indicator ' + (isTyping ? 'active' : '');
+                const msgsDiv = document.getElementById('messages');
+                msgsDiv.scrollTop = msgsDiv.scrollHeight;
             });
         }
 
         function cancelReply() { replyingTo = null; document.getElementById('reply-panel').style.display = 'none'; }
-        function exitChat() { db.ref('chats/' + [localStorage.getItem('myPhone'), currentChatPhone].sort().join('_')).off(); document.getElementById('chat-view').style.display = 'none'; document.getElementById('main-app').style.display = 'flex'; }
-        function sendMsg() { const input = document.getElementById('msgInput'); const text = input.value.trim(); if(!text) return; vibrate(); db.ref('chats/' + [localStorage.getItem('myPhone'), currentChatPhone].sort().join('_')).push({ text: text, from: localStorage.getItem('myPhone'), timestamp: Date.now(), read: false, replyTo: replyingTo }); input.value = ''; cancelReply(); }
-        function setTyping() { db.ref('chats/' + [localStorage.getItem('myPhone'), currentChatPhone].sort().join('_') + '/typing').set(localStorage.getItem('myPhone')); clearTimeout(typingTimer); typingTimer = setTimeout(() => db.ref('chats/' + [localStorage.getItem('myPhone'), currentChatPhone].sort().join('_') + '/typing').set(null), 2000); }
-        function saveContact() { const n = document.getElementById('newName').value; const p = document.getElementById('newPhone').value; if(!n || !p) { showToast(); return; } db.ref('users/' + localStorage.getItem('myPhone') + '/contacts/' + p).set({name: n, phone: p}); toggleModal(false); }
+        
+        function exitChat() { 
+            db.ref('chats/' + currentChatId).off(); 
+            document.getElementById('chat-view').style.display = 'none'; 
+            document.getElementById('main-app').style.display = 'flex'; 
+        }
+        
+        function sendMsg() { 
+            const input = document.getElementById('msgInput'); 
+            const text = input.value.trim(); 
+            if(!text) return; 
+            vibrate(); 
+            
+            db.ref('chats/' + currentChatId).push({ 
+                text: text, 
+                from: localStorage.getItem('myPhone'), 
+                timestamp: Date.now(), 
+                read: false, 
+                replyTo: replyingTo 
+            }); 
+            
+            input.value = ''; 
+            cancelReply(); 
+        }
+
+        // Zintegrowane przesyłanie zdjęć przez Cloudinary
+        function sendImage(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                showToast('Wysyłanie zdjęcia...');
+                
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('upload_preset', 'sm1234'); // upload name podany przez użytkownika
+
+                fetch('https://api.cloudinary.com/v1_1/drqvrxtlz/image/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.secure_url) {
+                        vibrate();
+                        db.ref('chats/' + currentChatId).push({ 
+                            image: data.secure_url, 
+                            from: localStorage.getItem('myPhone'), 
+                            timestamp: Date.now(), 
+                            read: false, 
+                            replyTo: replyingTo 
+                        });
+                        cancelReply();
+                        showToast('Zdjęcie wysłane');
+                    } else {
+                        showToast('Błąd wysyłania zdjęcia do Cloudinary');
+                    }
+                })
+                .catch(error => {
+                    console.error('Błąd:', error);
+                    showToast('Błąd sieci podczas wysyłania zdjęcia');
+                });
+            }
+        }
+
+        function setTyping() { 
+            db.ref('chats/' + currentChatId + '/typing').set(localStorage.getItem('myPhone')); 
+            clearTimeout(typingTimer); 
+            typingTimer = setTimeout(() => db.ref('chats/' + currentChatId + '/typing').set(null), 2000); 
+        }
+        
+        function saveContact() { 
+            const n = document.getElementById('newName').value.trim(); 
+            const p = document.getElementById('newPhone').value.trim(); 
+            if(!n || !p) { showToast('Wypełnij wszystkie pola'); return; } 
+            
+            db.ref('users/' + localStorage.getItem('myPhone') + '/contacts/' + p).set({name: n, phone: p}).then(() => {
+                toggleContactModal(false);
+                document.getElementById('newName').value = '';
+                document.getElementById('newPhone').value = '';
+                showToast('Kontakt dodany');
+            }); 
+        }
+
+        function createGroup() {
+            const gName = document.getElementById('groupNameInput').value.trim();
+            if(!gName) { showToast('Wpisz nazwę grupy'); return; }
+
+            const checkboxes = document.querySelectorAll('.group-member-checkbox:checked');
+            const members = {};
+            const myPhone = localStorage.getItem('myPhone');
+            members[myPhone] = true;
+            checkboxes.forEach(cb => members[cb.value] = true);
+
+            const groupId = 'group_' + Date.now();
+            const groupData = {
+                name: gName,
+                creator: myPhone,
+                members: members,
+                admins: { [myPhone]: true },
+                description: "Grupa utworzona w Liquid Glass Pro"
+            };
+
+            const updates = {};
+            updates['groups/' + groupId] = groupData;
+            Object.keys(members).forEach(phone => {
+                updates['users/' + phone + '/groups/' + groupId] = true;
+            });
+
+            db.ref().update(updates).then(() => {
+                toggleGroupModal(false);
+                document.getElementById('groupNameInput').value = '';
+                showToast('Utworzono grupę');
+            });
+        }
+
         if (localStorage.getItem('myPhone')) showApp();
     </script>
 </body>
